@@ -1,6 +1,7 @@
 name: "Build and Test"
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -108,8 +109,10 @@ jobs:
 
       - run: git stash # restore patch
 
-      - name: "Build Higress Binary"
-        run: GOPROXY="https://proxy.golang.org,direct" make build
+      - name: "Build Higress Binary (AMD64 & ARM64)"
+        run: |
+          GOPROXY="https://proxy.golang.org,direct" make build
+          GOPROXY="https://proxy.golang.org,direct" TARGET_ARCH=arm64 TARGET_OS=linux make build
 
       - name: Upload Higress Binary
         uses: actions/upload-artifact@v4

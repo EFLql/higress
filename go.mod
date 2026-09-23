@@ -216,7 +216,7 @@ require (
 	github.com/spf13/cast v1.8.0 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/tetratelabs/wazero v1.9.0 // indirect
+	github.com/tetratelabs/wazero v1.10.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
@@ -304,6 +304,8 @@ replace istio.io/api => ./external/api
 replace github.com/envoyproxy/go-control-plane => ./external/go-control-plane
 
 replace github.com/envoyproxy/go-control-plane/contrib => ./external/go-control-plane/contrib
+
+replace github.com/tetratelabs/wazero => github.com/tetratelabs/wazero v1.10.1
 
 replace github.com/envoyproxy/go-control-plane/envoy => ./external/go-control-plane/envoy
 

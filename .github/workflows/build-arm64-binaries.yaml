@@ -1,0 +1,108 @@
+name: "Build Higress for ARM64"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_os:
+        description: "Target OS platform"
+        required: true
+        default: "linux"
+        type: choice
+        options:
+          - "linux"
+          - "windows"
+          - "all"
+      build_hgctl:
+        description: "Also build hgctl CLI along with higress"
+        required: true
+        default: true
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - 'cmd/**'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/build-arm64-binaries.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-arm64:
+    name: Build ARM64 Binaries
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Verify Wazero Version
+        run: |
+          echo "=== Verifying wazero version in go.mod ==="
+          grep -n "wazero" go.mod || true
+          grep -n "replace.*wazero" go.mod || true
+
+      - name: Run Prebuild
+        run: |
+          git config --global user.email "ci@higress.io"
+          git config --global user.name "Higress CI"
+          chmod +x ./tools/hack/*.sh
+          GOPROXY="https://proxy.golang.org,direct" ./tools/hack/prebuild.sh
+
+      - name: Build Higress (Linux ARM64)
+        if: ${{ github.event_name == 'push' || inputs.target_os == 'linux' || inputs.target_os == 'all' }}
+        run: |
+          echo "Building Higress for Linux ARM64..."
+          mkdir -p bin/linux_arm64
+          GOPROXY="https://proxy.golang.org,direct" TARGET_ARCH=arm64 TARGET_OS=linux make build
+          cp out/linux_arm64/higress bin/linux_arm64/higress
+          file bin/linux_arm64/higress
+
+      - name: Build hgctl (Linux ARM64)
+        if: ${{ (github.event_name == 'push' || inputs.target_os == 'linux' || inputs.target_os == 'all') && (github.event_name == 'push' || inputs.build_hgctl) }}
+        run: |
+          echo "Building hgctl for Linux ARM64..."
+          mkdir -p bin/linux_arm64
+          GOPROXY="https://proxy.golang.org,direct" TARGET_ARCH=arm64 TARGET_OS=linux make build-hgctl
+          cp out/linux_arm64/hgctl bin/linux_arm64/hgctl
+          file bin/linux_arm64/hgctl
+
+      - name: Build hgctl (Windows ARM64)
+        if: ${{ (inputs.target_os == 'windows' || inputs.target_os == 'all') && inputs.build_hgctl }}
+        run: |
+          echo "Building hgctl for Windows ARM64..."
+          mkdir -p bin/windows_arm64
+          GOPROXY="https://proxy.golang.org,direct" TARGET_ARCH=arm64 TARGET_OS=windows make build-hgctl
+          cp out/windows_arm64/hgctl.exe bin/windows_arm64/hgctl.exe
+          file bin/windows_arm64/hgctl.exe
+
+      - name: Prepare Artifacts & Checksums
+        run: |
+          cd bin
+          find . -type f -exec sha256sum {} + | tee SHA256SUMS.txt
+          echo "### Build Artifacts (ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size | SHA256 |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          while read -r hash file; do
+            size=$(ls -lh "$file" | awk '{print $5}')
+            echo "| \`$file\` | $size | \`$hash\` |" >> $GITHUB_STEP_SUMMARY
+          done < SHA256SUMS.txt
+
+      - name: Upload ARM64 Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: higress-binaries-arm64
+          path: bin/
+          if-no-files-found: error
+          retention-days: 30
